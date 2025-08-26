@@ -39,11 +39,32 @@ def convert_to_palette(src_path, out_path, target_w, target_h):
     palimg = build_palette_image()
     img = Image.open(src_path).convert("RGB")
     iw, ih = img.size
+    
+    # Determine orientation of both target display and input image
+    target_is_landscape = target_w > target_h
+    image_is_landscape = iw > ih
+    
+    # Rotate image 90 degrees if orientations don't match
+    if target_is_landscape != image_is_landscape:
+        img = img.rotate(90, expand=True)
+        iw, ih = ih, iw  # Update dimensions after rotation
+    
+    # Calculate scaling while preserving aspect ratio
     scale = min(target_w/iw, target_h/ih)
-    nw, nh = max(1,int(iw*scale)), max(1,int(ih*scale))
+    nw, nh = max(1, int(iw*scale)), max(1, int(ih*scale))
+    
+    # Resize image maintaining aspect ratio
     img = img.resize((nw, nh), Image.LANCZOS)
+    
+    # Create white canvas with target dimensions
     canvas = Image.new("RGB", (target_w, target_h), (255,255,255))
-    canvas.paste(img, ((target_w-nw)//2, (target_h-nh)//2))
+    
+    # Center the image on canvas
+    x_offset = (target_w - nw) // 2
+    y_offset = (target_h - nh) // 2
+    canvas.paste(img, (x_offset, y_offset))
+    
+    # Quantize to palette colors
     q = canvas.quantize(palette=palimg, dither=Image.FLOYDSTEINBERG)
     q.save(out_path)
 
