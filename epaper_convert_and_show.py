@@ -93,36 +93,71 @@ def cleanup():
     """Restore cursor and terminal settings"""
     subprocess.run(["setterm", "-cursor", "on", "-term", "linux"], check=False)
 
+def resize_and_center(img, target_w, target_h):
+    """Resize and center image without palette conversion"""
+    iw, ih = img.size
+    
+    # Determine orientation
+    target_is_landscape = target_w > target_h
+    image_is_landscape = iw > ih
+    
+    # Rotate if needed
+    if target_is_landscape != image_is_landscape:
+        img = img.rotate(90, expand=True)
+        iw, ih = ih, iw
+    
+    # Calculate scaling
+    scale = min(target_w/iw, target_h/ih)
+    nw, nh = max(1, int(iw*scale)), max(1, int(ih*scale))
+    
+    # Resize
+    img = img.resize((nw, nh), Image.LANCZOS)
+    
+    # Center on white canvas
+    canvas = Image.new("RGB", (target_w, target_h), (255,255,255))
+    x_offset = (target_w - nw) // 2
+    y_offset = (target_h - nh) // 2
+    canvas.paste(img, (x_offset, y_offset))
+    
+    return canvas
+
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  Convert only: epaper_convert_and_show.py <input_image> [--lcd]")
-        print("  Convert and display: epaper_convert_and_show.py <input_image> [fbdev] [tty] [--lcd]")
+        print("  Convert: epaper_convert_and_show.py <input_image>")
+        print("  Raw display: epaper_convert_and_show.py <input_image> [fbdev] [tty] --raw")
         print("Example:")
         print("  epaper_convert_and_show.py ~/photo.jpg")
-        print("  epaper_convert_and_show.py ~/photo.jpg --lcd")
-        print("  epaper_convert_and_show.py ~/photo.jpg /dev/fb0 1 --lcd")
+        print("  epaper_convert_and_show.py ~/photo.jpg /dev/fb0 1 --raw")
         sys.exit(1)
 
     src = sys.argv[1]
-    display_type = 'lcd' if '--lcd' in sys.argv else 'normal'
+    is_raw = '--raw' in sys.argv
     out = Path(src).with_suffix('.converted.png')
     
-    if len(sys.argv) == 2 or (len(sys.argv) == 3 and '--lcd' in sys.argv):
+    if len(sys.argv) == 2:
         # Convert only mode
-        w, h = 800, 480  # Default resolution
-        convert_to_palette(src, out, w, h, display_type)
+        w, h = 800, 480
+        convert_to_palette(src, out, w, h)
         print(f"Converted image saved to: {out}")
     else:
         try:
-            # Convert and display mode
+            # Display mode
             args = [arg for arg in sys.argv[2:] if not arg.startswith('--')]
             fbdev = args[0] if args else "/dev/fb0"
             tty = args[1] if len(args) > 1 else "1"
 
             w, h = read_fb_resolution(fbdev)
             temp_out = "/tmp/epaper_preview.png"
-            convert_to_palette(src, temp_out, w, h, display_type)
+            
+            if is_raw:
+                # Raw display without palette conversion
+                img = Image.open(src).convert("RGB")
+                resized = resize_and_center(img, w, h)
+                resized.save(temp_out)
+            else:
+                # Normal palette conversion
+                convert_to_palette(src, temp_out, w, h)
 
             # show on the specified framebuffer TTY
             try:
