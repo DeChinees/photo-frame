@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys, os, subprocess
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 
 # 6-color e-ink palette (W, K, R, Y, B, G)
 PALETTE = [(255,255,255),(0,0,0),(255,0,0),(255,255,0),(0,0,255),(0,255,0)]
@@ -35,9 +35,30 @@ def read_fb_resolution(fbdev="/dev/fb0"):
     # Last resort
     return 800,480
 
-def convert_to_palette(src_path, out_path, target_w, target_h):
+def apply_lcd_effect(image):
+    """Apply LCD display simulation effects"""
+    # Enhance contrast slightly
+    contrast = ImageEnhance.Contrast(image)
+    image = contrast.enhance(1.2)
+    
+    # Add slight sharpness
+    sharpness = ImageEnhance.Sharpness(image)
+    image = sharpness.enhance(1.1)
+    
+    # Slightly increase brightness
+    brightness = ImageEnhance.Brightness(image)
+    image = brightness.enhance(1.1)
+    
+    return image
+
+def convert_to_palette(src_path, out_path, target_w, target_h, display_type='normal'):
     palimg = build_palette_image()
     img = Image.open(src_path).convert("RGB")
+    
+    # Apply display simulation effects
+    if display_type == 'lcd':
+        img = apply_lcd_effect(img)
+    
     iw, ih = img.size
     
     # Determine orientation of both target display and input image
@@ -75,31 +96,33 @@ def cleanup():
 def main():
     if len(sys.argv) < 2:
         print("Usage:")
-        print("  Convert only: epaper_convert_and_show.py <input_image>")
-        print("  Convert and display: epaper_convert_and_show.py <input_image> [fbdev] [tty]")
+        print("  Convert only: epaper_convert_and_show.py <input_image> [--lcd]")
+        print("  Convert and display: epaper_convert_and_show.py <input_image> [fbdev] [tty] [--lcd]")
         print("Example:")
         print("  epaper_convert_and_show.py ~/photo.jpg")
-        print("  epaper_convert_and_show.py ~/photo.jpg /dev/fb0 1")
+        print("  epaper_convert_and_show.py ~/photo.jpg --lcd")
+        print("  epaper_convert_and_show.py ~/photo.jpg /dev/fb0 1 --lcd")
         sys.exit(1)
 
     src = sys.argv[1]
-    # Get output filename based on input
+    display_type = 'lcd' if '--lcd' in sys.argv else 'normal'
     out = Path(src).with_suffix('.converted.png')
     
-    if len(sys.argv) == 2:
+    if len(sys.argv) == 2 or (len(sys.argv) == 3 and '--lcd' in sys.argv):
         # Convert only mode
         w, h = 800, 480  # Default resolution
-        convert_to_palette(src, out, w, h)
+        convert_to_palette(src, out, w, h, display_type)
         print(f"Converted image saved to: {out}")
     else:
         try:
             # Convert and display mode
-            fbdev = sys.argv[2] if len(sys.argv) > 2 else "/dev/fb0"
-            tty = sys.argv[3] if len(sys.argv) > 3 else "1"
+            args = [arg for arg in sys.argv[2:] if not arg.startswith('--')]
+            fbdev = args[0] if args else "/dev/fb0"
+            tty = args[1] if len(args) > 1 else "1"
 
             w, h = read_fb_resolution(fbdev)
             temp_out = "/tmp/epaper_preview.png"
-            convert_to_palette(src, temp_out, w, h)
+            convert_to_palette(src, temp_out, w, h, display_type)
 
             # show on the specified framebuffer TTY
             try:
