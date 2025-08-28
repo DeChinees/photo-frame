@@ -68,29 +68,48 @@ def convert_to_palette(src_path, out_path, target_w, target_h):
     q = canvas.quantize(palette=palimg, dither=Image.FLOYDSTEINBERG)
     q.save(out_path)
 
+def cleanup():
+    """Restore cursor and terminal settings"""
+    subprocess.run(["setterm", "-cursor", "on", "-term", "linux"], check=False)
+
 def main():
     if len(sys.argv) < 2:
-        print("usage: epaper_convert_and_show.py <input_image> [fbdev] [tty]")
-        print("example: epaper_convert_and_show.py ~/photo.jpg /dev/fb0 1")
+        print("Usage:")
+        print("  Convert only: epaper_convert_and_show.py <input_image>")
+        print("  Convert and display: epaper_convert_and_show.py <input_image> [fbdev] [tty]")
+        print("Example:")
+        print("  epaper_convert_and_show.py ~/photo.jpg")
+        print("  epaper_convert_and_show.py ~/photo.jpg /dev/fb0 1")
         sys.exit(1)
+
     src = sys.argv[1]
-    fbdev = sys.argv[2] if len(sys.argv) > 2 else "/dev/fb0"
-    tty = sys.argv[3] if len(sys.argv) > 3 else "1"
+    # Get output filename based on input
+    out = Path(src).with_suffix('.converted.png')
+    
+    if len(sys.argv) == 2:
+        # Convert only mode
+        w, h = 800, 480  # Default resolution
+        convert_to_palette(src, out, w, h)
+        print(f"Converted image saved to: {out}")
+    else:
+        try:
+            # Convert and display mode
+            fbdev = sys.argv[2] if len(sys.argv) > 2 else "/dev/fb0"
+            tty = sys.argv[3] if len(sys.argv) > 3 else "1"
 
-    w,h = read_fb_resolution(fbdev)
-    out = "/tmp/epaper_preview.png"
-    convert_to_palette(src, out, w, h)
+            w, h = read_fb_resolution(fbdev)
+            temp_out = "/tmp/epaper_preview.png"
+            convert_to_palette(src, temp_out, w, h)
 
-    # show on the specified framebuffer TTY, no X needed
-    # ensure we are on that tty (optional)
-    try:
-        subprocess.run(["chvt", str(tty)], check=False)
-    except Exception:
-        pass
-    # hide cursor (optional)
-    subprocess.run(["setterm","-cursor","off","-term","linux","-foreground","white","-clear","all"], check=False)
-    # display
-    subprocess.run(["sudo","fbi","-T", str(tty), "-d", fbdev, "--noverbose", "-a", out])
+            # show on the specified framebuffer TTY
+            try:
+                subprocess.run(["chvt", str(tty)], check=False)
+            except Exception:
+                pass
+            subprocess.run(["setterm","-cursor","off","-term","linux","-foreground","white","-clear","all"], check=False)
+            subprocess.run(["sudo","fbi","-T", str(tty), "-d", fbdev, "--noverbose", "-a", temp_out])
+        finally:
+            cleanup()
 
 if __name__ == "__main__":
     main()
