@@ -90,16 +90,17 @@ def main():
         # Give it time to complete the refresh
         time.sleep(2)
 
+        # Put panel to sleep (image remains)
+        epd.sleep()
+        
+        # Power down the panel completely
+        epd7in3e.epdconfig.module_exit()
+
     except KeyboardInterrupt:
-        pass
+        epd7in3e.epdconfig.module_exit()
     except Exception as e:
         print("Error:", e)
-    finally:
-        try:
-            # Put panel to sleep (image remains)
-            epd.sleep()
-        except Exception:
-            pass
+        epd7in3e.epdconfig.module_exit()
 
 if __name__ == "__main__":
     main()
