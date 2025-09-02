@@ -80,16 +80,16 @@ def main():
 
     try:
         epd = epd7in3e.EPD()
-        epd.Init()                      # power up + init
+        epd.init()                      # Changed from Init() to init()
         # If you see ghosting, you can epd.Clear() once on first use (slow).
-        # epd.Clear()
+        # epd.clear()                   # Also lowercase if needed
 
         # Prepare image
         src = Image.open(src_path)
         img = to_epaper_canvas(src, rotate=args.rotate)
 
         # Display
-        # Waveshare’s getbuffer() converts the PIL image to the panel’s buffer format.
+        # Waveshare's getbuffer() converts the PIL image to the panel's buffer format.
         epd.display(epd.getbuffer(img))
 
         # Give it time to complete the refresh (driver waits for BUSY; this is extra guard)
