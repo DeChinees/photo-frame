@@ -80,19 +80,14 @@ def main():
 
     try:
         epd = epd7in3e.EPD()
-        epd.init()                      # Changed from Init() to init()
-        # If you see ghosting, you can epd.Clear() once on first use (slow).
-        # epd.clear()                   # Also lowercase if needed
+        epd.init()
 
-        # Prepare image
+        # Prepare and display image
         src = Image.open(src_path)
         img = to_epaper_canvas(src, rotate=args.rotate)
-
-        # Display
-        # Waveshare's getbuffer() converts the PIL image to the panel's buffer format.
         epd.display(epd.getbuffer(img))
 
-        # Give it time to complete the refresh (driver waits for BUSY; this is extra guard)
+        # Give it time to complete the refresh
         time.sleep(2)
 
     except KeyboardInterrupt:
@@ -101,7 +96,7 @@ def main():
         print("Error:", e)
     finally:
         try:
-            # Put panel to sleep (extremely low power; image remains)
+            # Put panel to sleep (image remains)
             epd.sleep()
         except Exception:
             pass
