@@ -5,11 +5,43 @@ import RPi.GPIO as GPIO
 from PIL import Image
 from waveshare_epd import epd7in3e
 
+# Define GPIO pins used by the e-Paper HAT
+RST_PIN = 17
+DC_PIN = 25
+CS_PIN = 8
+BUSY_PIN = 24
+
+def check_gpio():
+    """Verify GPIO setup"""
+    try:
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setup(RST_PIN, GPIO.OUT)
+        GPIO.setup(DC_PIN, GPIO.OUT)
+        GPIO.setup(CS_PIN, GPIO.OUT)
+        GPIO.setup(BUSY_PIN, GPIO.IN)
+        print("GPIO setup successful")
+        return True
+    except Exception as e:
+        print(f"GPIO Error: {e}")
+        return False
+
+def check_busy_pin():
+    """Check if BUSY pin is responding"""
+    try:
+        state = GPIO.input(BUSY_PIN)
+        print(f"BUSY pin state: {state}")
+        return True
+    except Exception as e:
+        print(f"BUSY pin error: {e}")
+        return False
+
 def check_spi():
     """Verify SPI is working"""
     try:
         spi = spidev.SpiDev()
         spi.open(0, 0)  # Bus 0, Device 0
+        spi.max_speed_hz = 4000000
+        spi.mode = 0
         print("SPI connection successful")
         spi.close()
         return True
@@ -19,9 +51,19 @@ def check_spi():
 
 def main():
     try:
-        # Check SPI first
+        # Check GPIO first
+        if not check_gpio():
+            print("GPIO setup failed. Check permissions and connections.")
+            return
+
+        # Check SPI
         if not check_spi():
             print("SPI interface not available. Check if SPI is enabled.")
+            return
+
+        # Check BUSY pin
+        if not check_busy_pin():
+            print("BUSY pin not responding. Check connections.")
             return
 
         print("Creating EPD object...")
@@ -31,14 +73,13 @@ def main():
         epd.init()
         print("Initialization complete")
 
-        W, H = epd.width, epd.height
-        print(f"Display size: {W}x{H}")
-
-        print("Creating red image...")
-        red_img = Image.new("RGB", (W, H), (255, 0, 0))
+        # Test with smaller image first
+        test_size = (100, 100)
+        print(f"Creating test image {test_size}...")
+        test_img = Image.new("RGB", test_size, (255, 0, 0))
         
         print("Converting to display buffer...")
-        buffer = epd.getbuffer(red_img)
+        buffer = epd.getbuffer(test_img)
         
         print("Sending to display...")
         epd.display(buffer)
@@ -54,6 +95,8 @@ def main():
 
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
         
     finally:
         print("Cleanup...")
