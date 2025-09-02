@@ -47,32 +47,38 @@ def build_palette_image():
 PAL_IMG = build_palette_image()
 
 def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
-    """Return an 800x480 Image in our 6-color palette, filling the full width."""
+    """Return an 800x480 Image in our 6-color palette, filling the screen."""
     img = src.convert("RGB")
     if rotate in (90,180,270):
         img = img.rotate(rotate, expand=True)
 
     iw, ih = img.size
-    
-    # Calculate scaling to fill width while maintaining aspect ratio
-    scale = W/iw  # Scale to full width
-    nw, nh = W, int(ih*scale)
-    
-    # If height is too tall, scale down to fit height
-    if nh > H:
-        scale = H/ih
-        nw, nh = int(iw*scale), H
-    
-    img = img.resize((nw, nh), Image.LANCZOS)
+    target_ratio = W / H
+    image_ratio = iw / ih
 
-    # Create white canvas and center vertically
-    canvas = Image.new("RGB", (W, H), (255,255,255))
-    canvas.paste(img, (0, (H - nh)//2))
+    if image_ratio > target_ratio:
+        # Image is wider than display ratio - scale to height
+        scale = H / ih
+        nw, nh = int(iw * scale), H
+        # Center horizontally
+        x = (nw - W) // 2
+        y = 0
+        # Crop to width
+        img = img.resize((nw, nh), Image.LANCZOS)
+        img = img.crop((x, y, x + W, y + H))
+    else:
+        # Image is taller than display ratio - scale to width
+        scale = W / iw
+        nw, nh = W, int(ih * scale)
+        # Center vertically
+        x = 0
+        y = (nh - H) // 2
+        # Crop to height
+        img = img.resize((nw, nh), Image.LANCZOS)
+        img = img.crop((x, y, x + W, y + H))
 
     # Dither into fixed 6-color palette
-    q = canvas.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)
-    # Waveshare driver expects mode 'P' or 'RGB' depending on panel; their 7in3e
-    # driver handles color-indexed input via getbuffer().
+    q = img.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)
     return q
 
 def main():
