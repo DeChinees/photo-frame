@@ -11,10 +11,16 @@ DC_PIN = 25
 CS_PIN = 8
 BUSY_PIN = 24
 
+def setup_gpio():
+    """Setup GPIO with proper cleanup"""
+    GPIO.setwarnings(False)  # Disable warnings
+    GPIO.cleanup()  # Clean up first
+    GPIO.setmode(GPIO.BCM)
+    return check_gpio()
+
 def check_gpio():
     """Verify GPIO setup"""
     try:
-        GPIO.setmode(GPIO.BCM)
         GPIO.setup(RST_PIN, GPIO.OUT)
         GPIO.setup(DC_PIN, GPIO.OUT)
         GPIO.setup(CS_PIN, GPIO.OUT)
@@ -51,9 +57,9 @@ def check_spi():
 
 def main():
     try:
-        # Check GPIO first
-        if not check_gpio():
-            print("GPIO setup failed. Check permissions and connections.")
+        # Check GPIO first with proper setup
+        if not setup_gpio():
+            print("GPIO setup failed. Are you running with sudo?")
             return
 
         # Check SPI
@@ -101,10 +107,9 @@ def main():
     finally:
         print("Cleanup...")
         try:
-            epd.sleep()
+            GPIO.cleanup()
         except:
             pass
-        GPIO.cleanup()
 
 if __name__ == "__main__":
     main()
