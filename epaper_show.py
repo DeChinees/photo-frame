@@ -47,18 +47,27 @@ def build_palette_image():
 PAL_IMG = build_palette_image()
 
 def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
-    """Return an 800x480, dithered Image in our 6-color palette."""
+    """Return an 800x480 Image in our 6-color palette, filling the full width."""
     img = src.convert("RGB")
     if rotate in (90,180,270):
         img = img.rotate(rotate, expand=True)
 
     iw, ih = img.size
-    scale = min(W/iw, H/ih)
-    nw, nh = max(1, int(iw*scale)), max(1, int(ih*scale))
+    
+    # Calculate scaling to fill width while maintaining aspect ratio
+    scale = W/iw  # Scale to full width
+    nw, nh = W, int(ih*scale)
+    
+    # If height is too tall, scale down to fit height
+    if nh > H:
+        scale = H/ih
+        nw, nh = int(iw*scale), H
+    
     img = img.resize((nw, nh), Image.LANCZOS)
 
+    # Create white canvas and center vertically
     canvas = Image.new("RGB", (W, H), (255,255,255))
-    canvas.paste(img, ((W - nw)//2, (H - nh)//2))
+    canvas.paste(img, (0, (H - nh)//2))
 
     # Dither into fixed 6-color palette
     q = canvas.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)
