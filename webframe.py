@@ -7,11 +7,12 @@ from PIL import Image
 import pillow_heif
 
 # --- Paths & constants ---
-BASE      = Path(__file__).resolve().parent
-SRC_DIR   = BASE / "photos_src"
-READY_DIR = BASE / "photos_ready"
-THUMB_DIR = BASE / "thumbs"
-LINK_PATH = BASE / "current.bmp"   # symlink to the chosen ready image
+BASE = Path(__file__).resolve().parent
+PHOTOS_BASE = BASE / "photos"
+SRC_DIR     = PHOTOS_BASE / "photos_source"
+READY_DIR   = PHOTOS_BASE / "photos_ready"
+THUMB_DIR   = PHOTOS_BASE / "thumbs"
+LINK_PATH   = PHOTOS_BASE / "current.bmp"
 __version__ = "0.0.1"
 
 W, H = 800, 480

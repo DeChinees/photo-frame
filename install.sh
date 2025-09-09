@@ -31,8 +31,10 @@ echo "==> Upgrading pip & installing Python deps…"
 
 # --- data folders ---
 echo "==> Creating data folders…"
-mkdir -p "$REPO_DIR/photos_src" "$REPO_DIR/photos_ready" "$REPO_DIR/thumbs"
-
+mkdir -p "$REPO_DIR/photos/photos_source" \
+         "$REPO_DIR/photos/photos_ready" \
+         "$REPO_DIR/photos/thumbs"
+         
 # --- sanity check ---
 if [[ ! -f "$WEB_PY" ]]; then
   echo "!! $WEB_PY not found. Please place webframe.py in the repo root."
