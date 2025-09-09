@@ -32,33 +32,49 @@
 <!-- Gallery -->
 <div class="section card">
   <h3 class="h3">Gallery</h3>
+
+  <!-- Bulk delete form (stands alone; checkboxes will point to it via form="bulkForm") -->
+  <form method="post"
+        action="{{ url_for('delete_selected') }}"
+        id="bulkForm"
+        onsubmit="return confirm('Delete selected images?');">
+    <input type="hidden" name="token" value="{{ token }}">
+    <div class="controls" style="margin:8px 0">
+      <button class="btn danger" type="submit">🗑 Delete selected</button>
+      <button class="btn" type="button" id="selectAllBtn">Select all</button>
+    </div>
+  </form>
+
+  <!-- Not inside any form -->
   {% if items %}
-    <form method="post" action="{{ url_for('delete_selected') }}" id="gridForm" onsubmit="return confirm('Delete selected images?');">
-      <input type="hidden" name="token" value="{{ token }}">
-      <div class="grid">
-        {% for it in items %}
-          <div class="card-item">
-            <label class="row" style="margin-bottom:8px">
-              <input type="checkbox" name="names" value="{{ it }}" class="chk">
-              <span class="muted">Select</span>
-            </label>
-            <a class="figure" href="{{ url_for('get_ready', name=it) }}" target="_blank" title="{{ it }}">
-              <img class="thumb" loading="lazy"
-                   src="{{ url_for('get_thumb', name=it.rsplit('.',1)[0]+'.jpg') }}"
-                   alt="{{ it }}">
-            </a>
-            <div class="controls">
-              <form method="post" action="{{ url_for('set_current') }}">
-                <input type="hidden" name="name" value="{{ it }}">
-                <input type="hidden" name="token" value="{{ token }}">
-                <button class="btn" type="submit">Display</button>
-              </form>
-            </div>
-            <div class="muted ellipsis" title="{{ it }}">{{ it }}</div>
+    <div class="grid">
+      {% for it in items %}
+        <div class="card-item">
+          <!-- Checkbox belongs to bulkForm via form="bulkForm" -->
+          <label class="row" style="margin-bottom:8px">
+            <input type="checkbox" name="names" value="{{ it }}" class="chk" form="bulkForm">
+            <span class="muted">Select</span>
+          </label>
+
+          <a class="figure" href="{{ url_for('get_ready', name=it) }}" target="_blank" title="{{ it }}">
+            <img class="thumb" loading="lazy"
+                 src="{{ url_for('get_thumb', name=it.rsplit('.',1)[0]+'.jpg') }}"
+                 alt="{{ it }}">
+          </a>
+
+          <!-- Per-card Display form stays separate -->
+          <div class="controls">
+            <form method="post" action="{{ url_for('set_current') }}">
+              <input type="hidden" name="name" value="{{ it }}">
+              <input type="hidden" name="token" value="{{ token }}">
+              <button class="btn" type="submit">Display</button>
+            </form>
           </div>
-        {% endfor %}
-      </div>
-    </form>
+
+          <div class="muted ellipsis" title="{{ it }}">{{ it }}</div>
+        </div>
+      {% endfor %}
+    </div>
   {% else %}
     <p class="muted">No prepared images yet.</p>
   {% endif %}
@@ -69,5 +85,18 @@
   <h3 class="h3">Current target</h3>
   <p class="muted">{{ current or "None" }}</p>
 </div>
+
+<script>
+(function(){
+  const selectBtn = document.getElementById('selectAllBtn');
+  if (!selectBtn) return;
+  selectBtn.addEventListener('click', () => {
+    const boxes = document.querySelectorAll('input.chk[type=checkbox]');
+    const allChecked = Array.from(boxes).every(b => b.checked);
+    boxes.forEach(b => b.checked = !allChecked);
+    selectBtn.textContent = allChecked ? 'Select all' : 'Unselect all';
+  });
+})();
+</script>
 
 {% endblock %}

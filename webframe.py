@@ -255,12 +255,14 @@ def set_current():
 @app.route("/delete_selected", methods=["POST"])
 def delete_selected():
     require_token(request)
-    names = request.form.getlist("names")
+    names = request.form.getlist("names") or request.form.getlist("names[]")
+    log.info("delete: received %d selected name(s)", len(names))
     if not names:
+        log.warning("delete: nothing selected")
         return redirect(url_for("home"))
-    for n in set(names):
+    for n in sorted(set(names)):
         delete_triplet_by_ready_name(n)
-        log.info("delete: %s (ready/src/thumb)", n)
+        log.info("delete: removed %s (ready/src/thumb)", n)
     return redirect(url_for("home"))
 
 @app.route("/ready/<path:name>")
