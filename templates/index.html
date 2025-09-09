@@ -22,7 +22,7 @@
       <div><strong>Tap to choose</strong> — or drag & drop photos here</div>
       <div class="hint">Optimized for mobile.</div>
       <div style="margin-top:12px;">
-        <button class="btn primary" type="submit">Upload</button>
+       <button class="btn primary" type="button" id="pickBtn">Upload</button>
       </div>
     </div>
   </form>
@@ -86,13 +86,46 @@
 
 <script>
 (function(){
-  const selectBtn = document.getElementById('selectAllBtn');
-  if (!selectBtn) return;
-  selectBtn.addEventListener('click', () => {
-    const boxes = document.querySelectorAll('input.chk[type=checkbox]');
-    const allChecked = Array.from(boxes).every(b => b.checked);
-    boxes.forEach(b => b.checked = !allChecked);
-    selectBtn.textContent = allChecked ? 'Select all' : 'Unselect all';
+  const dz   = document.getElementById('dropzone');
+  const fi   = document.getElementById('fileInput');
+  const form = document.getElementById('uploadForm');
+  const btn  = document.getElementById('pickBtn');
+  if (!dz || !fi || !form) return;
+
+  // Button opens file picker
+  if (btn) btn.addEventListener('click', () => fi.click());
+
+  // Prevent empty submits (e.g., Enter key)
+  form.addEventListener('submit', (e) => {
+    if (!fi.files || !fi.files.length) {
+      e.preventDefault();
+      fi.click();
+    }
+  });
+
+  // Click/tap dropzone -> open picker
+  dz.addEventListener('click', () => fi.click());
+  dz.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+  });
+
+  // Auto-submit when files chosen
+  fi.addEventListener('change', () => {
+    if (fi.files && fi.files.length) form.requestSubmit();
+  });
+
+  // Drag & drop styling + auto-submit
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
+  }));
+  dz.addEventListener('drop', e => {
+    if (e.dataTransfer?.files?.length) {
+      fi.files = e.dataTransfer.files;
+      form.requestSubmit();
+    }
   });
 })();
 </script>
