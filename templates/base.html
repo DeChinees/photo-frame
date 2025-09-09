@@ -14,7 +14,6 @@
   <div class="header-inner">
     <div class="title">📷 Photo Frame</div>
     <div class="row">
-      <!-- Removed redundant Delete / Select all buttons -->
       <span class="badge">{{ items|length }} ready</span>
     </div>
   </div>
@@ -29,35 +28,47 @@
 
 <script>
 (function(){
-  const dz = document.getElementById('dropzone');
-  const fi = document.getElementById('fileInput');
+  // Elements used by the upload UX (present on the index page)
+  const dz   = document.getElementById('dropzone');
+  const fi   = document.getElementById('fileInput');
   const form = document.getElementById('uploadForm');
-  if (!dz || !fi || !form) return;
+  const btn  = document.getElementById('pickBtn');
 
-  // Click/tap dropzone -> open picker
-  dz.addEventListener('click', () => fi.click());
-  dz.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
-  });
+  // Only wire up if the upload form exists
+  if (dz && fi && form) {
+    // Button opens picker (does NOT submit)
+    if (btn) btn.addEventListener('click', () => fi.click());
 
-  // Auto-submit when files chosen via picker
-  fi.addEventListener('change', () => {
-    if (fi.files && fi.files.length) form.requestSubmit();
-  });
+    // Dropzone opens picker
+    dz.addEventListener('click', () => fi.click());
+    dz.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+    });
 
-  // Drag & drop
-  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
-    e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
-  }));
-  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
-    e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
-  }));
-  dz.addEventListener('drop', e => {
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
-      fi.files = e.dataTransfer.files;       // attach files to the real input
-      form.requestSubmit();                  // submit form with files
-    }
-  });
+    // Auto-submit when files are actually chosen
+    fi.addEventListener('change', () => {
+      if (fi.files && fi.files.length) form.requestSubmit();
+    });
+
+    // Drag & drop styling + auto-submit
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
+    }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
+    }));
+    dz.addEventListener('drop', e => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        fi.files = e.dataTransfer.files;   // attach dropped files to the input
+        form.requestSubmit();              // submit with files
+      }
+    });
+
+    // Prevent Enter key from submitting an empty form
+    form.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (!fi.files || !fi.files.length)) e.preventDefault();
+    });
+  }
 })();
 </script>
 

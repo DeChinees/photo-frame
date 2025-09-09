@@ -12,17 +12,14 @@
         enctype="multipart/form-data"
         id="uploadForm">
     <input type="hidden" name="token" value="{{ token }}">
-
-    <!-- Hidden actual file input -->
     <input type="file" id="fileInput" name="files" multiple
            accept="image/*,image/heic" style="display:none">
 
-    <!-- Visual dropzone (button centered inside) -->
     <div class="upload" id="dropzone" tabindex="0" role="button" aria-label="Upload photos">
       <div><strong>Tap to choose</strong> — or drag & drop photos here</div>
       <div class="hint">Optimized for mobile.</div>
       <div style="margin-top:12px;">
-       <button class="btn primary" type="button" id="pickBtn">Upload</button>
+        <button class="btn primary" type="button" id="pickBtn">Upload</button>
       </div>
     </div>
   </form>
@@ -48,7 +45,6 @@
     <div class="grid">
       {% for it in items %}
         <div class="card-item">
-          <!-- Checkbox belongs to bulkForm via form="bulkForm" -->
           <label class="row" style="margin-bottom:8px">
             <input type="checkbox" name="names" value="{{ it }}" class="chk" form="bulkForm">
             <span class="muted">Select</span>
@@ -60,7 +56,6 @@
                  alt="{{ it }}">
           </a>
 
-          <!-- Per-card Display form stays separate -->
           <div class="controls">
             <form method="post" action="{{ url_for('set_current') }}">
               <input type="hidden" name="name" value="{{ it }}">
@@ -83,51 +78,5 @@
   <h3 class="h3">Current target</h3>
   <p class="muted">{{ current or "None" }}</p>
 </div>
-
-<script>
-(function(){
-  const dz   = document.getElementById('dropzone');
-  const fi   = document.getElementById('fileInput');
-  const form = document.getElementById('uploadForm');
-  const btn  = document.getElementById('pickBtn');
-  if (!dz || !fi || !form) return;
-
-  // Button opens file picker
-  if (btn) btn.addEventListener('click', () => fi.click());
-
-  // Prevent empty submits (e.g., Enter key)
-  form.addEventListener('submit', (e) => {
-    if (!fi.files || !fi.files.length) {
-      e.preventDefault();
-      fi.click();
-    }
-  });
-
-  // Click/tap dropzone -> open picker
-  dz.addEventListener('click', () => fi.click());
-  dz.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
-  });
-
-  // Auto-submit when files chosen
-  fi.addEventListener('change', () => {
-    if (fi.files && fi.files.length) form.requestSubmit();
-  });
-
-  // Drag & drop styling + auto-submit
-  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
-    e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
-  }));
-  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
-    e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
-  }));
-  dz.addEventListener('drop', e => {
-    if (e.dataTransfer?.files?.length) {
-      fi.files = e.dataTransfer.files;
-      form.requestSubmit();
-    }
-  });
-})();
-</script>
 
 {% endblock %}
