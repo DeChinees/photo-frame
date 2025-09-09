@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>{% block title %}Photo Frame{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+{% block head %}{% endblock %}
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="title">📷 Photo Frame</div>
+    <div class="row">
+      <form method="post" action="{{ url_for('delete_selected') }}" id="bulkDeleteForm">
+        <input type="hidden" name="token" value="{{ token }}">
+        <button class="btn danger" type="submit" title="Delete selected">🗑 Delete</button>
+      </form>
+      <button class="btn" id="selectAllBtn" type="button">Select all</button>
+      <span class="badge">{{ items|length }} ready</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  {% block content %}{% endblock %}
+  <div class="footer">Created by <a href="https://github.com/DeChinees" target="_blank">DeChinees</a> · v{{ version }}</div>
+</div>
+
+<script>
+(function(){
+  const selectBtn = document.getElementById('selectAllBtn');
+  selectBtn?.addEventListener('click', () => {
+    const boxes = document.querySelectorAll('input.chk[type=checkbox]');
+    const allChecked = Array.from(boxes).every(b => b.checked);
+    boxes.forEach(b => b.checked = !allChecked);
+    selectBtn.textContent = (allChecked ? 'Select all' : 'Unselect all');
+  });
+
+  const dz = document.getElementById('dropzone');
+  const fi = document.getElementById('fileInput');
+  const form = document.getElementById('uploadForm');
+  if (dz && fi && form) {
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
+    }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
+    }));
+    dz.addEventListener('drop', e => {
+      if (e.dataTransfer?.files?.length) {
+        fi.files = e.dataTransfer.files;
+        form.requestSubmit();
+      }
+    });
+    dz.addEventListener('click', () => fi.click());
+  }
+})();
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

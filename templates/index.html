@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Photo Frame{% endblock %}
+
+{% block content %}
+
+<!-- Upload -->
+<div class="section card">
+  <h3 class="h3">Upload</h3>
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="uploadForm">
+    <input type="hidden" name="token" value="{{ token }}">
+    <label class="upload" id="dropzone">
+      <input type="file" name="files" id="fileInput" multiple accept="image/*,image/heic">
+      <div><strong>Tap to choose</strong> — or drag & drop photos here</div>
+      <div class="hint">Optimized for mobile: big targets, fast thumbnails, lazy loading.</div>
+      <div style="margin-top:12px;">
+        <button class="btn primary" type="submit">Upload</button>
+      </div>
+    </label>
+  </form>
+</div>
+
+<!-- Gallery -->
+<div class="section card">
+  <h3 class="h3">Gallery</h3>
+  {% if items %}
+    <form method="post" action="{{ url_for('delete_selected') }}" id="gridForm" onsubmit="return confirm('Delete selected images?');">
+      <input type="hidden" name="token" value="{{ token }}">
+      <div class="grid">
+        {% for it in items %}
+          <div class="card-item">
+            <label class="row" style="margin-bottom:8px">
+              <input type="checkbox" name="names" value="{{ it }}" class="chk">
+              <span class="muted">Select</span>
+            </label>
+            <a class="figure" href="{{ url_for('get_ready', name=it) }}" target="_blank" title="{{ it }}">
+              <img class="thumb" loading="lazy"
+                   src="{{ url_for('get_thumb', name=it.rsplit('.',1)[0]+'.jpg') }}"
+                   alt="{{ it }}">
+            </a>
+            <div class="controls">
+              <form method="post" action="{{ url_for('set_current') }}">
+                <input type="hidden" name="name" value="{{ it }}">
+                <input type="hidden" name="token" value="{{ token }}">
+                <button class="btn" type="submit">Display</button>
+              </form>
+            </div>
+            <div class="muted ellipsis" title="{{ it }}">{{ it }}</div>
+          </div>
+        {% endfor %}
+      </div>
+    </form>
+  {% else %}
+    <p class="muted">No prepared images yet.</p>
+  {% endif %}
+</div>
+
+<!-- Current target -->
+<div class="section card">
+  <h3 class="h3">Current target</h3>
+  <p class="muted">{{ current or "None" }}</p>
+</div>
+
+{% endblock %}

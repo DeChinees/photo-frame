@@ -1,83 +1,76 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Exit on error
-set -e
+# --- config you can tweak ---
+SERVICE_WEB=photoframe-web.service
+FRAME_TOKEN_DEFAULT="changeme123"
+PYTHON_BIN="/usr/bin/python3"
 
-echo "Installing Photo Frame..."
+# --- resolve paths ---
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="$REPO_DIR/.venv"
+WEB_PY="$REPO_DIR/webframe.py"
 
-# Check if running on Raspberry Pi
-if ! grep -q "Raspberry Pi" /proc/cpuinfo; then
-    echo "This script must be run on a Raspberry Pi"
-    exit 1
+echo "==> Repo dir: $REPO_DIR"
+echo "==> User: $(whoami)"
+
+# --- apt dependencies ---
+echo "==> Installing apt packages…"
+sudo apt update
+sudo apt install -y python3-venv python3-dev libheif1 libheif-dev libjpeg62-turbo \
+                    avahi-daemon
+
+# --- python venv ---
+if [[ ! -d "$VENV_DIR" ]]; then
+  echo "==> Creating venv at $VENV_DIR"
+  "$PYTHON_BIN" -m venv "$VENV_DIR"
+fi
+echo "==> Upgrading pip & installing Python deps…"
+"$VENV_DIR/bin/pip" install --upgrade pip wheel
+"$VENV_DIR/bin/pip" install flask pillow pillow-heif
+
+# --- data folders ---
+echo "==> Creating data folders…"
+mkdir -p "$REPO_DIR/photos_src" "$REPO_DIR/photos_ready" "$REPO_DIR/thumbs"
+
+# --- sanity check ---
+if [[ ! -f "$WEB_PY" ]]; then
+  echo "!! $WEB_PY not found. Please place webframe.py in the repo root."
+  exit 1
 fi
 
-# Update system
-echo "Updating system..."
-sudo apt-get update
-sudo apt-get upgrade -y
+# --- systemd unit ---
+UNIT_WEB_PATH="/etc/systemd/system/$SERVICE_WEB"
 
-# Install system dependencies
-echo "Installing system dependencies..."
-sudo apt-get install -y \
-    python3-pip \
-    python3-venv \
-    python3-pil
-
-# Enable SPI
-echo "Enabling SPI interface..."
-sudo raspi-config nonint do_spi 0
-
-# Create virtual environment
-echo "Setting up Python virtual environment..."
-python3 -m venv venv
-source venv/bin/activate
-
-# Install Python dependencies
-echo "Installing Python dependencies..."
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# Clone Waveshare e-Paper library if not exists
-if [ ! -d "e-Paper" ]; then
-    echo "Downloading Waveshare e-Paper library..."
-    git clone https://github.com/waveshare/e-Paper.git
-    ln -s e-Paper/RaspberryPi_JetsonNano/python/lib/waveshare_epd .
-fi
-
-# Set up service directories
-echo "Creating required directories..."
-mkdir -p photos_src photos_ready thumbs
-
-# Set permissions
-echo "Setting up permissions..."
-sudo usermod -a -G spi,gpio $USER
-
-# Create systemd service for web interface
-echo "Creating systemd service..."
-sudo tee /etc/systemd/system/photoframe.service > /dev/null << EOL
+echo "==> Writing $UNIT_WEB_PATH"
+sudo tee "$UNIT_WEB_PATH" >/dev/null <<UNIT
 [Unit]
-Description=Photo Frame Web Interface
-After=network.target
+Description=Photo Frame Web UI (uploads + conversion)
+After=network-online.target
 
 [Service]
-ExecStart=$(pwd)/venv/bin/python $(pwd)/webframe.py
-WorkingDirectory=$(pwd)
-Environment=FRAME_TOKEN=changeme123
-User=$USER
+User=$(whoami)
+WorkingDirectory=$REPO_DIR
+# Token for upload actions (header or hidden field)
+Environment=FRAME_TOKEN=${FRAME_TOKEN_DEFAULT}
+ExecStart=$VENV_DIR/bin/python $WEB_PY
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
-EOL
+UNIT
 
-# Enable and start service
-sudo systemctl enable photoframe
-sudo systemctl start photoframe
+# --- reload & enable services ---
+echo "==> Reloading systemd…"
+sudo systemctl daemon-reload
 
-echo "Installation complete!"
-echo "Please reboot your Raspberry Pi to ensure all changes take effect."
-echo "Default web interface will be available at: http://$(hostname):5000"
-echo "Default token is: changeme123"
-echo "Change the token by editing /etc/systemd/system/photoframe.service"
-echo ""
-echo "To reboot now, type: sudo reboot"
+echo "==> Enabling + starting web UI service…"
+sudo systemctl enable --now "$SERVICE_WEB"
+
+echo "==> Web UI status:"
+systemctl --no-pager --full status "$SERVICE_WEB" || true
+
+echo
+echo "==> Done."
+echo "Open:  http://photoframe.local:5000/"
+echo "Token: ${FRAME_TOKEN_DEFAULT}  (change it by editing $UNIT_WEB_PATH and restarting the service)"
