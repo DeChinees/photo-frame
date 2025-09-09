@@ -48,8 +48,22 @@ for p in (SRC_DIR, READY_DIR, THUMB_DIR):
 # ========================
 # Logging -> /var/log/photo-frame/web.log (1MB rotate, keep 5)
 # ========================
-LOG_DIR = Path("/var/log/photo-frame")
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+def get_log_dir():
+    """Return a log directory that is writable on this system."""
+    preferred = Path("/var/log/photo-frame")
+    local_fallback = Path(__file__).parent / "logs"
+
+    try:
+        preferred.mkdir(parents=True, exist_ok=True)
+        test_file = preferred / ".writetest"
+        test_file.write_text("ok")
+        test_file.unlink()
+        return preferred
+    except Exception:
+        local_fallback.mkdir(parents=True, exist_ok=True)
+        return local_fallback
+
+LOG_DIR = get_log_dir()
 LOG_FILE = LOG_DIR / "web.log"
 
 handler = RotatingFileHandler(LOG_FILE, maxBytes=1 * 1024 * 1024, backupCount=5)
