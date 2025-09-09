@@ -6,16 +6,26 @@
 <!-- Upload -->
 <div class="section card">
   <h3 class="h3">Upload</h3>
-  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" id="uploadForm">
+
+  <form method="post"
+        action="{{ url_for('upload') }}"
+        enctype="multipart/form-data"
+        id="uploadForm">
     <input type="hidden" name="token" value="{{ token }}">
-    <label class="upload" id="dropzone">
-      <input type="file" name="files" id="fileInput" multiple accept="image/*,image/heic">
+
+    <!-- Hidden actual file input -->
+    <input type="file" id="fileInput" name="files" multiple
+           accept="image/*,image/heic" style="display:none">
+
+    <!-- Visual dropzone (no form elements inside) -->
+    <div class="upload" id="dropzone" tabindex="0" role="button" aria-label="Upload photos">
       <div><strong>Tap to choose</strong> — or drag & drop photos here</div>
-      <div class="hint">Optimized for mobile: big targets, fast thumbnails, lazy loading.</div>
-      <div style="margin-top:12px;">
-        <button class="btn primary" type="submit">Upload</button>
-      </div>
-    </label>
+      <div class="hint">Optimized for mobile.</div>
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" type="submit">Upload</button>
+    </div>
   </form>
 </div>
 

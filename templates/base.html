@@ -31,32 +31,34 @@
 
 <script>
 (function(){
-  const selectBtn = document.getElementById('selectAllBtn');
-  selectBtn?.addEventListener('click', () => {
-    const boxes = document.querySelectorAll('input.chk[type=checkbox]');
-    const allChecked = Array.from(boxes).every(b => b.checked);
-    boxes.forEach(b => b.checked = !allChecked);
-    selectBtn.textContent = (allChecked ? 'Select all' : 'Unselect all');
-  });
-
   const dz = document.getElementById('dropzone');
   const fi = document.getElementById('fileInput');
   const form = document.getElementById('uploadForm');
-  if (dz && fi && form) {
-    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
-      e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
-    }));
-    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
-      e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
-    }));
-    dz.addEventListener('drop', e => {
-      if (e.dataTransfer?.files?.length) {
-        fi.files = e.dataTransfer.files;
-        form.requestSubmit();
-      }
-    });
-    dz.addEventListener('click', () => fi.click());
-  }
+
+  // Click/tap dropzone -> open picker
+  dz.addEventListener('click', () => fi.click());
+  dz.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
+  });
+
+  // Auto-submit when files chosen via picker
+  fi.addEventListener('change', () => {
+    if (fi.files && fi.files.length) form.requestSubmit();
+  });
+
+  // Drag & drop
+  ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
+  }));
+  ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); dz.classList.remove('drag');
+  }));
+  dz.addEventListener('drop', e => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+      fi.files = e.dataTransfer.files;       // attach files to the real input
+      form.requestSubmit();                  // submit form with files
+    }
+  });
 })();
 </script>
 

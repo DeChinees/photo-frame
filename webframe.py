@@ -180,11 +180,11 @@ def upload():
     require_token(request)
 
     # Accept both "files" and "files[]"
-    files = request.files.getlist("files")
-    if not files:
-        files = request.files.getlist("files[]")
-
+    files = request.files.getlist("files") or request.files.getlist("files[]")
     log.info("upload: received %d file fields", len(files))
+    for i, f in enumerate(files):
+        log.info("upload: field %d filename=%r", i, getattr(f, "filename", None))
+
     if not files:
         log.warning("upload: no files in request (check form name & enctype)")
         return redirect(url_for("home"))
@@ -193,13 +193,10 @@ def upload():
     for f in files:
         try:
             if not f or not f.filename:
+                log.warning("upload: skipped empty field")
                 continue
-            # safe filename (browser can send odd characters)
-            safe = secure_filename(f.filename)
-            if not safe:
-                safe = f"upload_{secrets.token_hex(4)}.jpg"
 
-            # Save raw first
+            safe = secure_filename(f.filename) or f"upload_{secrets.token_hex(4)}.jpg"
             raw_tmp = SRC_DIR / safe
             f.save(raw_tmp)
             log.info("upload: saved raw %s", raw_tmp.name)
@@ -207,36 +204,37 @@ def upload():
             # Normalize HEIC -> JPEG if needed
             raw = normalize_to_jpeg_if_heic(raw_tmp)
 
-            # Create timestamped base name for READY/THUMB
+            # Timestamp base name for ready + thumb
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             base = f"{stamp}-{Path(raw).stem}"
 
-            # Rename/move source to match the same STEM, so delete can find it
+            # Move source file to match timestamped stem
             src_final = SRC_DIR / f"{base}{Path(raw).suffix.lower()}"
-            try:
-                if raw != src_final:
+            if raw != src_final:
+                try:
                     raw.replace(src_final)
                     raw = src_final
-            except Exception as e:
-                log.warning("upload: could not rename source to %s: %s", src_final.name, e)
+                except Exception as e:
+                    log.warning("upload: could not rename source to %s: %s", src_final.name, e)
 
             ready_path = READY_DIR / f"{base}.bmp"
-            thumb_path = THUMB_DIR  / f"{base}.jpg"
+            thumb_path = THUMB_DIR / f"{base}.jpg"
 
-            # Convert for e-paper + make thumbnail
+            # Convert for e-paper
             frame = prepare_epaper_frame(raw)
             frame.save(ready_path, "BMP")
 
+            # Generate thumbnail
             thumb_w = 320
             thumb_h = int(thumb_w * H / W)
-            frame.convert("RGB").resize((thumb_w, thumb_h), Image.LANCZOS).save(thumb_path, "JPEG", quality=85)
+            frame.convert("RGB").resize((thumb_w, thumb_h), Image.LANCZOS)\
+                 .save(thumb_path, "JPEG", quality=85)
 
             saved += 1
             log.info("upload: prepared %s (+thumb)", ready_path.name)
 
         except Exception as e:
-            log.exception("upload: error handling one file: %s", e)
-            continue
+            log.exception("upload: error while processing file: %s", e)
 
     log.info("upload: prepared %d image(s) total", saved)
     return redirect(url_for("home"))
