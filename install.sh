@@ -19,7 +19,7 @@ echo "==> Installing apt packages…"
 sudo apt update
 sudo apt install -y \
   python3-venv python3-dev libjpeg62-turbo \
-  libheif1 libheif-examples \  # heif-convert binary for HEIC -> JPEG
+  libheif1 libheif-examples \
   avahi-daemon
 
 # --- python venv ---
