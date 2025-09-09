@@ -12,15 +12,14 @@
         enctype="multipart/form-data"
         id="uploadForm">
     <input type="hidden" name="token" value="{{ token }}">
+    <!-- Hidden actual file input -->
     <input type="file" id="fileInput" name="files" multiple
            accept="image/*,image/heic" style="display:none">
 
+    <!-- Visual dropzone (no submit button; click/drag handled in base.js) -->
     <div class="upload" id="dropzone" tabindex="0" role="button" aria-label="Upload photos">
       <div><strong>Tap to choose</strong> — or drag & drop photos here</div>
       <div class="hint">Optimized for mobile.</div>
-      <div style="margin-top:12px;">
-        <button class="btn primary" type="button" id="pickBtn">Upload</button>
-      </div>
     </div>
   </form>
 </div>
@@ -29,7 +28,7 @@
 <div class="section card">
   <h3 class="h3">Gallery</h3>
 
-  <!-- Bulk delete form (stands alone; checkboxes point to it via form="bulkForm") -->
+  <!-- Bulk delete form (checkboxes reference this via form="bulkForm") -->
   <form method="post"
         action="{{ url_for('delete_selected') }}"
         id="bulkForm"

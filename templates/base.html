@@ -28,29 +28,24 @@
 
 <script>
 (function(){
-  // Elements used by the upload UX (present on the index page)
+  // --- Upload (dropzone-only) ---
   const dz   = document.getElementById('dropzone');
   const fi   = document.getElementById('fileInput');
   const form = document.getElementById('uploadForm');
-  const btn  = document.getElementById('pickBtn');
 
-  // Only wire up if the upload form exists
   if (dz && fi && form) {
-    // Button opens picker (does NOT submit)
-    if (btn) btn.addEventListener('click', () => fi.click());
-
-    // Dropzone opens picker
+    // Click/tap dropzone -> open picker
     dz.addEventListener('click', () => fi.click());
     dz.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fi.click(); }
     });
 
-    // Auto-submit when files are actually chosen
+    // Auto-submit when files chosen via picker
     fi.addEventListener('change', () => {
       if (fi.files && fi.files.length) form.requestSubmit();
     });
 
-    // Drag & drop styling + auto-submit
+    // Drag & drop behavior + styling
     ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
       e.preventDefault(); e.stopPropagation(); dz.classList.add('drag');
     }));
@@ -63,10 +58,30 @@
         form.requestSubmit();              // submit with files
       }
     });
+  }
 
-    // Prevent Enter key from submitting an empty form
-    form.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (!fi.files || !fi.files.length)) e.preventDefault();
+  // --- Select all toggle for delete section ---
+  const selectBtn = document.getElementById('selectAllBtn');
+  if (selectBtn) {
+    const updateLabel = () => {
+      const boxes = document.querySelectorAll('input.chk[type=checkbox]');
+      const allChecked = boxes.length && Array.from(boxes).every(b => b.checked);
+      selectBtn.textContent = allChecked ? 'Unselect all' : 'Select all';
+    };
+
+    selectBtn.addEventListener('click', () => {
+      const boxes = document.querySelectorAll('input.chk[type=checkbox]');
+      const allChecked = boxes.length && Array.from(boxes).every(b => b.checked);
+      boxes.forEach(b => b.checked = !allChecked);
+      updateLabel();
+    });
+
+    // keep label correct on initial load and after any manual clicks
+    updateLabel();
+    document.addEventListener('change', (e) => {
+      if (e.target && e.target.classList && e.target.classList.contains('chk')) {
+        updateLabel();
+      }
     });
   }
 })();
