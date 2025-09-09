@@ -14,11 +14,7 @@
   <div class="header-inner">
     <div class="title">📷 Photo Frame</div>
     <div class="row">
-      <form method="post" action="{{ url_for('delete_selected') }}" id="bulkDeleteForm">
-        <input type="hidden" name="token" value="{{ token }}">
-        <button class="btn danger" type="submit" title="Delete selected">🗑 Delete</button>
-      </form>
-      <button class="btn" id="selectAllBtn" type="button">Select all</button>
+      <!-- Removed redundant Delete / Select all buttons -->
       <span class="badge">{{ items|length }} ready</span>
     </div>
   </div>
@@ -26,7 +22,9 @@
 
 <div class="container">
   {% block content %}{% endblock %}
-  <div class="footer">Created by <a href="https://github.com/DeChinees" target="_blank">DeChinees</a> · v{{ version }}</div>
+  <div class="footer">
+    Created by <a href="https://github.com/DeChinees" target="_blank">DeChinees</a> · v{{ version }}
+  </div>
 </div>
 
 <script>
@@ -34,6 +32,7 @@
   const dz = document.getElementById('dropzone');
   const fi = document.getElementById('fileInput');
   const form = document.getElementById('uploadForm');
+  if (!dz || !fi || !form) return;
 
   // Click/tap dropzone -> open picker
   dz.addEventListener('click', () => fi.click());

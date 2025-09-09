@@ -17,14 +17,13 @@
     <input type="file" id="fileInput" name="files" multiple
            accept="image/*,image/heic" style="display:none">
 
-    <!-- Visual dropzone (no form elements inside) -->
+    <!-- Visual dropzone (button centered inside) -->
     <div class="upload" id="dropzone" tabindex="0" role="button" aria-label="Upload photos">
       <div><strong>Tap to choose</strong> — or drag & drop photos here</div>
       <div class="hint">Optimized for mobile.</div>
-    </div>
-
-    <div class="controls">
-      <button class="btn primary" type="submit">Upload</button>
+      <div style="margin-top:12px;">
+        <button class="btn primary" type="submit">Upload</button>
+      </div>
     </div>
   </form>
 </div>
@@ -33,7 +32,7 @@
 <div class="section card">
   <h3 class="h3">Gallery</h3>
 
-  <!-- Bulk delete form (stands alone; checkboxes will point to it via form="bulkForm") -->
+  <!-- Bulk delete form (stands alone; checkboxes point to it via form="bulkForm") -->
   <form method="post"
         action="{{ url_for('delete_selected') }}"
         id="bulkForm"
@@ -45,7 +44,6 @@
     </div>
   </form>
 
-  <!-- Not inside any form -->
   {% if items %}
     <div class="grid">
       {% for it in items %}
