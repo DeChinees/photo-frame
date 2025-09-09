@@ -1,173 +1,154 @@
 #!/usr/bin/env python3
 import os
+import subprocess
 from pathlib import Path
 from datetime import datetime
-from flask import Flask, request, redirect, url_for, render_template_string, send_from_directory, abort, render_template
+from flask import (
+    Flask, request, redirect, url_for,
+    render_template, send_from_directory, abort
+)
 from PIL import Image
-import pillow_heif
 
-# --- Paths & constants ---
+# --- Paths ---
 BASE = Path(__file__).resolve().parent
 PHOTOS_BASE = BASE / "photos"
-SRC_DIR     = PHOTOS_BASE / "photos_source"
-READY_DIR   = PHOTOS_BASE / "photos_ready"
-THUMB_DIR   = PHOTOS_BASE / "thumbs"
-LINK_PATH   = PHOTOS_BASE / "current.bmp"
-__version__ = "0.0.1"
+SRC_DIR   = PHOTOS_BASE / "photos_source"
+READY_DIR = PHOTOS_BASE / "photos_ready"
+THUMB_DIR = PHOTOS_BASE / "thumbs"
+LINK_PATH = PHOTOS_BASE / "current.bmp"
 
 W, H = 800, 480
-PALETTE = [(255,255,255),(0,0,0),(255,0,0),(255,255,0),(0,0,255),(0,255,0)]
+PALETTE = [
+    (255, 255, 255),
+    (0, 0, 0),
+    (255, 0, 0),
+    (255, 255, 0),
+    (0, 0, 255),
+    (0, 255, 0),
+]
 TOKEN = os.environ.get("FRAME_TOKEN", "changeme123")
 
 for p in (SRC_DIR, READY_DIR, THUMB_DIR):
     p.mkdir(parents=True, exist_ok=True)
 
-# Let Pillow open HEIC from iPhones
-pillow_heif.register_heif_opener()
+# --- HEIC helper ---
+HEIC_EXTS = {".heic", ".heif"}
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
-# helpful during development:
-app.config["TEMPLATES_AUTO_RELOAD"] = True
+def normalize_to_jpeg_if_heic(path: Path) -> Path:
+    """If file is HEIC/HEIF, convert to JPEG with heif-convert, return new path."""
+    if path.suffix.lower() not in HEIC_EXTS:
+        return path
+    jpg = path.with_suffix(".jpg")
+    try:
+        subprocess.run(
+            ["heif-convert", str(path), str(jpg)],
+            check=True, capture_output=True
+        )
+        path.unlink(missing_ok=True)
+        return jpg
+    except Exception as e:
+        print("[upload] HEIC convert failed:", e)
+        return path
 
-# --- Helpers ---
-def _pal():
-    pal = Image.new("P",(1,1))
-    flat=[]
-    for r,g,b in PALETTE: flat += [r,g,b]
-    flat += [0,0,0]*(256-len(PALETTE))
-    pal.putpalette(flat)
-    return pal
+# --- Image conversion ---
+def to_frame(src: Path, dst: Path, thumb: Path):
+    im = Image.open(src).convert("RGB")
+    im = im.resize((W, H))
+    im = im.quantize(palette=Image.new("P", (1, 1), 0), colors=len(PALETTE))
+    im.save(dst, "BMP")
 
-PAL_IMG = _pal()
-
-def to_frame(img: Image.Image) -> Image.Image:
-    img = img.convert("RGB")
-    iw, ih = img.size
-    scale = min(W/iw, H/ih)
-    nw, nh = max(1,int(iw*scale)), max(1,int(ih*scale))
-    img = img.resize((nw, nh), Image.LANCZOS)
-    canvas = Image.new("RGB",(W,H),(255,255,255))
-    canvas.paste(img, ((W-nw)//2,(H-nh)//2))
-    return canvas.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)  # 'P'
+    t = im.copy()
+    t.thumbnail((200, 120))
+    t.save(thumb, "JPEG", quality=80)
 
 def list_ready():
     return sorted([p.name for p in READY_DIR.glob("*.bmp")])
 
-def set_symlink(target: Path):
-    tmp_link = LINK_PATH.with_suffix(".tmp")
-    if tmp_link.exists() or tmp_link.is_symlink():
-        tmp_link.unlink()
-    # relative link (safe for moving the folder)
-    tmp_link.symlink_to(target)
-    tmp_link.replace(LINK_PATH)
+def set_symlink(name: str):
+    LINK_PATH.unlink(missing_ok=True)
+    (READY_DIR / name).symlink_to(LINK_PATH)
 
 def require_token(req):
-    if req.headers.get("X-Auth-Token") != TOKEN and req.form.get("token") != TOKEN:
-        abort(401)
+    t = req.form.get("token") or req.args.get("token")
+    if t != TOKEN:
+        abort(403)
 
-def delete_by_ready_name(ready_name: str):
-    """Delete original(s) with matching stem, the ready BMP, and the thumbnail.
-       If current.bmp points to this file, unlink it."""
-    ready_path = READY_DIR / ready_name
-    stem = Path(ready_name).stem
+# --- Flask app ---
+app = Flask(__name__, template_folder="templates", static_folder="static")
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
-    if ready_path.exists():
-        try: ready_path.unlink()
-        except Exception: pass
-
-    thumb_path = THUMB_DIR / (stem + ".jpg")
-    if thumb_path.exists():
-        try: thumb_path.unlink()
-        except Exception: pass
-
-    for p in SRC_DIR.glob(stem + ".*"):
-        try: p.unlink()
-        except Exception: pass
-
-    try:
-        if LINK_PATH.is_symlink() and LINK_PATH.resolve().name == ready_name:
-            LINK_PATH.unlink(missing_ok=True)
-    except Exception:
-        pass
-
-# --- Routes ---
 @app.route("/")
 def home():
     current = None
     if LINK_PATH.is_symlink():
-        try: current = LINK_PATH.resolve().name
+        try:
+            current = LINK_PATH.resolve().name
         except Exception:
-            try: current = str(LINK_PATH.readlink())
-            except Exception: current = None
-    return render_template("index.html",
-                           items=list_ready(),
-                           current=current,
-                           token=TOKEN,
-                           version=__version__)
+            try:
+                current = str(LINK_PATH.readlink())
+            except Exception:
+                current = None
+    return render_template(
+        "index.html",
+        items=list_ready(),
+        current=current,
+        token=TOKEN,
+        version="0.1.0",
+    )
 
 @app.route("/upload", methods=["POST"])
 def upload():
     require_token(request)
     files = request.files.getlist("files")
-    if not files:
-        abort(400, "No files")
-
     for f in files:
         if not f.filename:
             continue
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        safe = "".join(c for c in f.filename if c.isalnum() or c in "._-")
-        raw = SRC_DIR / f"{ts}-{safe}"
+        raw = SRC_DIR / f.filename
         f.save(raw)
 
-        im = Image.open(raw).convert("RGB")
-        frame = to_frame(im)
-        out = READY_DIR / (raw.stem + ".bmp")
-        frame.save(out, "BMP")
-
-        # Thumbnail from prepared frame (always 800x480 origin)
-        th = THUMB_DIR / (out.stem + ".jpg")
-        thumb_w = 320
-        thumb_h = int(thumb_w * H / W)
-        frame.convert("RGB").resize((thumb_w, thumb_h), Image.LANCZOS).save(th, "JPEG", quality=85)
-
-    # NOTE: we intentionally do NOT set current.bmp here anymore.
+        raw = normalize_to_jpeg_if_heic(raw)
+        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        base = f"{stamp}-{Path(raw).stem}"
+        out = READY_DIR / f"{base}.bmp"
+        thumb = THUMB_DIR / f"{base}.jpg"
+        try:
+            to_frame(raw, out, thumb)
+        except Exception as e:
+            print("[upload] conversion failed:", e)
+            continue
     return redirect(url_for("home"))
 
 @app.route("/set_current", methods=["POST"])
 def set_current():
     require_token(request)
-    name = request.form.get("name","")
-    target = READY_DIR / name
-    if not target.exists():
-        abort(404)
-    set_symlink(target)
+    name = request.form.get("name")
+    if not name:
+        abort(400)
+    set_symlink(name)
     return redirect(url_for("home"))
 
 @app.route("/delete_selected", methods=["POST"])
 def delete_selected():
     require_token(request)
-    names = request.form.getlist("names")  # list of ready filenames (*.bmp)
-    if not names:
-        return redirect(url_for("home"))
-
-    seen = set()
-    for name in names:
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        if (READY_DIR / name).exists():
-            delete_by_ready_name(name)
-
+    names = request.form.getlist("names")
+    for n in names:
+        bmp = READY_DIR / n
+        jpg = THUMB_DIR / (Path(n).stem + ".jpg")
+        src = SRC_DIR / (Path(n).stem + Path(n).suffix)
+        for p in (bmp, jpg, src):
+            if p.exists():
+                p.unlink()
+        if LINK_PATH.is_symlink() and LINK_PATH.resolve().name == n:
+            LINK_PATH.unlink(missing_ok=True)
     return redirect(url_for("home"))
 
-@app.route("/ready/<path:name>")
+@app.route("/ready/<name>")
 def get_ready(name):
     return send_from_directory(READY_DIR, name)
 
-@app.route("/thumbs/<path:name>")
+@app.route("/thumbs/<name>")
 def get_thumb(name):
     return send_from_directory(THUMB_DIR, name)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)

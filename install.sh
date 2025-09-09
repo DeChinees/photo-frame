@@ -17,31 +17,35 @@ echo "==> User: $(whoami)"
 # --- apt dependencies ---
 echo "==> Installing apt packages…"
 sudo apt update
-sudo apt install -y python3-venv python3-dev libheif1 libheif-dev libjpeg62-turbo \
-                    avahi-daemon
+sudo apt install -y \
+  python3-venv python3-dev libjpeg62-turbo \
+  libheif1 libheif-examples \  # heif-convert binary for HEIC -> JPEG
+  avahi-daemon
 
 # --- python venv ---
 if [[ ! -d "$VENV_DIR" ]]; then
   echo "==> Creating venv at $VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
+
 echo "==> Upgrading pip & installing Python deps…"
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
-"$VENV_DIR/bin/pip" install flask pillow pillow-heif
+"$VENV_DIR/bin/pip" install flask pillow
 
-# --- data folders ---
-echo "==> Creating data folders…"
-mkdir -p "$REPO_DIR/photos/photos_source" \
-         "$REPO_DIR/photos/photos_ready" \
-         "$REPO_DIR/photos/thumbs"
-         
-# --- sanity check ---
+# --- data folders (new structure under photos/) ---
+echo "==> Creating photos/ folder structure…"
+mkdir -p \
+  "$REPO_DIR/photos/photos_source" \
+  "$REPO_DIR/photos/photos_ready" \
+  "$REPO_DIR/photos/thumbs"
+
+# --- sanity checks ---
 if [[ ! -f "$WEB_PY" ]]; then
-  echo "!! $WEB_PY not found. Please place webframe.py in the repo root."
+  echo "!! $WEB_PY not found. Place webframe.py in the repo root."
   exit 1
 fi
 
-# --- systemd unit ---
+# --- systemd unit for web ui ---
 UNIT_WEB_PATH="/etc/systemd/system/$SERVICE_WEB"
 
 echo "==> Writing $UNIT_WEB_PATH"
@@ -75,4 +79,6 @@ systemctl --no-pager --full status "$SERVICE_WEB" || true
 echo
 echo "==> Done."
 echo "Open:  http://photoframe.local:5000/"
-echo "Token: ${FRAME_TOKEN_DEFAULT}  (change it by editing $UNIT_WEB_PATH and restarting the service)"
+echo "Token: ${FRAME_TOKEN_DEFAULT}  (change by editing $UNIT_WEB_PATH then: sudo systemctl daemon-reload && sudo systemctl restart $SERVICE_WEB)"
+echo
+echo "HEIC support uses: heif-convert (from libheif-examples). Make sure your webframe.py calls it when .heic files are uploaded."
