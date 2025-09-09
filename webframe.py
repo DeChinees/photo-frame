@@ -17,7 +17,7 @@ from logging.handlers import RotatingFileHandler
 # ========================
 # Config / Constants
 # ========================
-__version__ = "0.1.1"
+__version__ = "0.0.1"
 
 BASE = Path(__file__).resolve().parent
 PHOTOS_BASE = BASE / "photos"
