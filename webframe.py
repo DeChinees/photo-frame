@@ -8,6 +8,9 @@ from flask import (
     render_template, send_from_directory, abort
 )
 from PIL import Image
+import logging
+from logging.handlers import RotatingFileHandler
+
 
 # --- Paths ---
 BASE = Path(__file__).resolve().parent
@@ -72,6 +75,24 @@ def require_token(req):
     t = req.form.get("token") or req.args.get("token")
     if t != TOKEN:
         abort(403)
+
+# --- Logging ---
+LOG_DIR = Path("/var/log/photo-frame")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "web.log"
+
+handler = RotatingFileHandler(
+    LOG_FILE, maxBytes=1*1024*1024, backupCount=5
+)
+formatter = logging.Formatter(
+    "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+handler.setFormatter(formatter)
+handler.setLevel(logging.INFO)
+
+root = logging.getLogger()
+root.setLevel(logging.INFO)
+root.addHandler(handler)
 
 # --- Flask app ---
 app = Flask(__name__, template_folder="templates", static_folder="static")

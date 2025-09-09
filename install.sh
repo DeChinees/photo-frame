@@ -22,24 +22,38 @@ sudo apt install -y \
   libheif1 libheif-examples \
   avahi-daemon
 
+# quick sanity: heif-convert present?
+if ! command -v heif-convert >/dev/null 2>&1; then
+  echo "!! heif-convert not found; HEIC uploads won't auto-convert. Did libheif-examples install?"
+fi
+
 # --- python venv ---
 if [[ ! -d "$VENV_DIR" ]]; then
   echo "==> Creating venv at $VENV_DIR"
   "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
-
 echo "==> Upgrading pip & installing Python deps…"
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
 "$VENV_DIR/bin/pip" install flask pillow
 
-# --- data folders (new structure under photos/) ---
+# --- project folders ---
 echo "==> Creating photos/ folder structure…"
 mkdir -p \
   "$REPO_DIR/photos/photos_source" \
   "$REPO_DIR/photos/photos_ready" \
   "$REPO_DIR/photos/thumbs"
 
-# --- sanity checks ---
+# (optional) keep empty dirs in git
+for d in photos/photos_source photos/photos_ready photos/thumbs; do
+  [[ -f "$REPO_DIR/$d/.gitkeep" ]] || touch "$REPO_DIR/$d/.gitkeep"
+done
+
+# --- logging directory for Flask rotating logs ---
+echo "==> Preparing log directory…"
+sudo mkdir -p /var/log/photo-frame
+sudo chown "$(whoami)":"$(id -gn)" /var/log/photo-frame
+
+# --- sanity check for app file ---
 if [[ ! -f "$WEB_PY" ]]; then
   echo "!! $WEB_PY not found. Place webframe.py in the repo root."
   exit 1
@@ -57,16 +71,19 @@ After=network-online.target
 [Service]
 User=$(whoami)
 WorkingDirectory=$REPO_DIR
-# Token for upload actions (header or hidden field)
 Environment=FRAME_TOKEN=${FRAME_TOKEN_DEFAULT}
+# Use the venv python so site-packages resolve correctly
 ExecStart=$VENV_DIR/bin/python $WEB_PY
 Restart=always
+# If you configured RotatingFileHandler in webframe.py, send stdout/stderr nowhere:
+StandardOutput=null
+StandardError=null
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
-# --- reload & enable services ---
+# --- reload & enable service ---
 echo "==> Reloading systemd…"
 sudo systemctl daemon-reload
 
@@ -79,6 +96,4 @@ systemctl --no-pager --full status "$SERVICE_WEB" || true
 echo
 echo "==> Done."
 echo "Open:  http://photoframe.local:5000/"
-echo "Token: ${FRAME_TOKEN_DEFAULT}  (change by editing $UNIT_WEB_PATH then: sudo systemctl daemon-reload && sudo systemctl restart $SERVICE_WEB)"
-echo
-echo "HEIC support uses: heif-convert (from libheif-examples). Make sure your webframe.py calls it when .heic files are uploaded."
+echo "Token: ${FRAME_TOKEN_DEFAULT}  (change by editing $UNIT_WEB_PATH, then: sudo systemctl daemon-reload && sudo systemctl restart $SERVICE_WEB)"
