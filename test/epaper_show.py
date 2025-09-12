@@ -4,21 +4,20 @@
 # Display a photo on Waveshare 7.3" e-Paper HAT (E).
 # - Resizes/letterboxes to 800x480
 # - Quantizes to Spectra-6 palette (W,K,R,Y,B,G) with dithering
-# - Full refresh, then sleeps the panel
+# - **Full refresh (clear to white) before displaying the new image**
+# - Sleeps the panel after display
 #
 # Usage:
 #   python3 epaper_show.py /path/to/photo.jpg
 #
 # Optional:
-#   python3 epaper_show.py /path/to/photo.jpg --rotate 0|90|180|270
+#   python3 epaper_show.py /path/to/photo.jpg --rotate 0|90|180|270 [--no-full]
 
 import sys, argparse, time
 from pathlib import Path
 from PIL import Image
 
 # Import Waveshare driver
-# Make sure you run this from inside the Waveshare examples directory OR
-# that the 'lib' folder is on sys.path.
 dir_epd = str(Path(__file__).resolve().parents[1] / "lib")
 if dir_epd not in sys.path:
     sys.path.append(dir_epd)
@@ -57,35 +56,28 @@ def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
     image_ratio = iw / ih
 
     if image_ratio > target_ratio:
-        # Image is wider than display ratio - scale to height
+        # wider than display ratio -> scale to height, center/crop width
         scale = H / ih
         nw, nh = int(iw * scale), H
-        # Center horizontally
         x = (nw - W) // 2
-        y = 0
-        # Crop to width
-        img = img.resize((nw, nh), Image.LANCZOS)
-        img = img.crop((x, y, x + W, y + H))
+        img = img.resize((nw, nh), Image.LANCZOS).crop((x, 0, x + W, H))
     else:
-        # Image is taller than display ratio - scale to width
+        # taller than display ratio -> scale to width, center/crop height
         scale = W / iw
         nw, nh = W, int(ih * scale)
-        # Center vertically
-        x = 0
         y = (nh - H) // 2
-        # Crop to height
-        img = img.resize((nw, nh), Image.LANCZOS)
-        img = img.crop((x, y, x + W, y + H))
+        img = img.resize((nw, nh), Image.LANCZOS).crop((0, y, W, y + H))
 
     # Dither into fixed 6-color palette
-    q = img.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)
-    return q
+    return img.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image", help="Path to source image (jpg/png/etc.)")
     ap.add_argument("--rotate", type=int, choices=[0,90,180,270], default=0,
                     help="Rotate before placing onto canvas")
+    ap.add_argument("--no-full", action="store_true",
+                    help="Skip the full white refresh before displaying")
     args = ap.parse_args()
 
     src_path = Path(args.image)
@@ -93,29 +85,40 @@ def main():
         print(f"File not found: {src_path}")
         sys.exit(1)
 
+    epd = None
     try:
         epd = epd7in3e.EPD()
         epd.init()
+
+        if not args.no_full:
+            # Full panel clear to white (driver default color is white for this panel)
+            epd.Clear()
+            # Give the panel a moment to settle
+            time.sleep(1.0)
+            # Some Waveshare drivers need re-init after a Clear()
+            epd.init()
 
         # Prepare and display image
         src = Image.open(src_path)
         img = to_epaper_canvas(src, rotate=args.rotate)
         epd.display(epd.getbuffer(img))
 
-        # Give it time to complete the refresh
-        time.sleep(2)
+        # Ensure refresh has time to complete
+        time.sleep(2.0)
 
         # Put panel to sleep (image remains)
         epd.sleep()
-        
-        # Power down the panel completely
-        epd7in3e.epdconfig.module_exit()
 
     except KeyboardInterrupt:
-        epd7in3e.epdconfig.module_exit()
+        pass
     except Exception as e:
         print("Error:", e)
-        epd7in3e.epdconfig.module_exit()
+    finally:
+        # Always exit the SPI/GPIO module cleanly
+        try:
+            epd7in3e.epdconfig.module_exit()
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()
