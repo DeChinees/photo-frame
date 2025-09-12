@@ -23,7 +23,8 @@ echo "==> Installing apt packages…"
 sudo apt update
 sudo apt install -y \
   python3-venv python3-dev python3-pip \
-  libjpeg62-turbo zlib1g libopenjp2-7 libtiff5 libfreetype6 libwebp6 \
+  python3-gpiozero \
+  libjpeg62-turbo zlib1g libopenjp2-7 \
   libheif1 libheif-examples \
   avahi-daemon \
   raspi-config
@@ -48,12 +49,17 @@ echo "==> Upgrading pip & installing Python deps…"
 # - flask: web UI (remove if not used)
 # - pillow: image handling
 # - gpiozero, spidev, RPi.GPIO: GPIO/SPI stack for Waveshare drivers
-"$VENV_DIR/bin/pip" install \
-  flask \
-  pillow \
-  gpiozero \
-  spidev \
-  RPi.GPIO
+# "$VENV_DIR/bin/pip" install \
+#   flask \
+#   pillow \
+#   gpiozero \
+#   spidev \
+#   RPi.GPIO
+
+"$VENV_DIR/bin/python" -m pip install --upgrade pip setuptools wheel
+"$VENV_DIR/bin/pip" install flask pillow gpiozero spidev RPi.GPIO
+# optional, ignore failure:
+"$VENV_DIR/bin/pip" install lgpio || true
 
 # Try lgpio (preferred backend for gpiozero on newer Pi OS); ignore failure
 if "$VENV_DIR/bin/pip " install lgpio >/dev/null 2>&1; then
