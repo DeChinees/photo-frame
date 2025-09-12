@@ -1,24 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-#
-# Display a photo OR a solid color on Waveshare 7.3" e-Paper HAT (E).
-# - Optional deep-clear cycles through ALL 6 Spectra colors (K,W,R,Y,B,G, then W)
-# - Image mode: resizes/crops to 800x480 and quantizes to 6-color palette (dithered)
-# - Solid mode: ignores image, shows a full-screen color (white/black/red/yellow/blue/green)
-# - Sleeps panel after display and exits GPIO/SPI cleanly
-#
-# Examples:
-#   # Show a photo (rotate 90 deg)
-#   python3 epaper_show.py photos/cat.jpg --rotate 90
-#
-#   # Deep clear 1 cycle through all colors, then show a photo
-#   python3 epaper_show.py photos/cat.jpg --deep-clear 1
-#
-#   # Just show a solid red frame (no image)
-#   python3 epaper_show.py --solid red
-#
-#   # Two full deep-clear cycles, then show solid white
-#   python3 epaper_show.py --deep-clear 2 --solid white
 
 import sys
 import argparse
@@ -27,7 +8,6 @@ from pathlib import Path
 from PIL import Image
 
 # --- Import Waveshare driver ---
-# Adjust search paths so this works when run from your repo or from the Waveshare example tree
 _repo_lib = Path(__file__).resolve().parents[1] / "lib"
 _local_ws = Path(__file__).resolve().parent / "waveshare_epd"
 for _p in (str(_repo_lib), str(_local_ws)):
@@ -47,7 +27,6 @@ PALETTE = [
     (0, 0, 255),      # blue
     (0, 255, 0),      # green
 ]
-
 COLOR_MAP = {
     "white":  (255, 255, 255),
     "black":  (0, 0, 0),
@@ -62,14 +41,13 @@ def _build_palette_img():
     flat = []
     for (r, g, b) in PALETTE:
         flat += [r, g, b]
-    # pad to 256 entries
     flat += [0, 0, 0] * (256 - len(PALETTE))
     pal.putpalette(flat)
     return pal
 
 PAL_IMG = _build_palette_img()
 
-# --- Deep clear sequence: ALL colors, end with white ---
+# Deep-clear over ALL colors, end on white
 DEEP_CLEAN_SEQUENCE = [
     (0, 0, 0),         # black
     (255, 255, 255),   # white
@@ -77,23 +55,20 @@ DEEP_CLEAN_SEQUENCE = [
     (255, 255, 0),     # yellow
     (0, 0, 255),       # blue
     (0, 255, 0),       # green
-    (255, 255, 255),   # white (final bleach)
+    (255, 255, 255),   # white (final)
 ]
 
 def _solid_frame(epd, rgb, wait=2.0):
-    """Display a solid color frame and wait for refresh to finish."""
     img = Image.new("RGB", (W, H), rgb).quantize(palette=PAL_IMG, dither=Image.NONE)
     epd.display(epd.getbuffer(img))
     time.sleep(wait)
 
 def deep_clear(epd, cycles=1, wait=2.0):
-    """Aggressive de-ghosting: sweep all Spectra colors per cycle."""
     for _ in range(cycles):
         for rgb in DEEP_CLEAN_SEQUENCE:
             _solid_frame(epd, rgb, wait)
 
 def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
-    """Resize/crop to 800x480 and quantize to 6-color palette (dithered)."""
     img = src.convert("RGB")
     if rotate in (90, 180, 270):
         img = img.rotate(rotate, expand=True)
@@ -103,13 +78,11 @@ def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
     image_ratio = iw / ih
 
     if image_ratio > target_ratio:
-        # wider than display ratio -> scale to height, center/crop width
         scale = H / ih
         nw, nh = int(iw * scale), H
         x = (nw - W) // 2
         img = img.resize((nw, nh), Image.LANCZOS).crop((x, 0, x + W, H))
     else:
-        # taller than display ratio -> scale to width, center/crop height
         scale = W / iw
         nw, nh = W, int(ih * scale)
         y = (nh - H) // 2
@@ -130,16 +103,16 @@ def main():
                     help="Ignore image and render a solid frame: white|black|red|yellow|blue|green")
     args = ap.parse_args()
 
-    # Validate inputs
-    if not args.solid and not args.image:
-        ap.error("Provide an image OR use --solid <color>")
+    # NEW: allow deep-clear only; error only if nothing at all was requested
+    if not args.solid and not args.image and args.deep_clear == 0:
+        ap.error("Provide an image OR --solid <color> OR --deep-clear N")
 
     epd = None
     try:
         epd = epd7in3e.EPD()
         epd.init()
 
-        # Optional: aggressive clean
+        # Optional deep-clear first
         if args.deep_clear > 0:
             print(f"[epaper] Deep clear: {args.deep_clear} cycle(s) over all colors…")
             deep_clear(epd, cycles=args.deep_clear, wait=args.clear_wait)
@@ -151,14 +124,14 @@ def main():
             print(f"[epaper] Solid frame: {args.solid}")
             _solid_frame(epd, rgb, wait=2.0)
 
-        else:
+        elif args.image:
             # Image mode
             src_path = Path(args.image)
             if not src_path.exists():
                 print(f"[epaper] File not found: {src_path}")
                 sys.exit(1)
 
-            # Optional light white frame helps neutralize minor tint
+            # Light pre-bleach to white
             _solid_frame(epd, (255, 255, 255), wait=1.0)
             epd.init()
 
@@ -168,21 +141,21 @@ def main():
             epd.display(epd.getbuffer(img))
             time.sleep(2.0)
 
-        # Done
+        else:
+            # Deep-clear only case (no image/solid): end on white
+            print("[epaper] Deep-clear only; leaving panel white.")
+            _solid_frame(epd, (255, 255, 255), wait=1.0)
+
         epd.sleep()
         epd7in3e.epdconfig.module_exit()
 
     except KeyboardInterrupt:
-        try:
-            epd7in3e.epdconfig.module_exit()
-        except Exception:
-            pass
+        try: epd7in3e.epdconfig.module_exit()
+        except Exception: pass
     except Exception as e:
         print("[epaper] Error:", e)
-        try:
-            epd7in3e.epdconfig.module_exit()
-        except Exception:
-            pass
+        try: epd7in3e.epdconfig.module_exit()
+        except Exception: pass
 
 if __name__ == "__main__":
     main()
