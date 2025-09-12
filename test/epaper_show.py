@@ -4,14 +4,14 @@
 # Display a photo on Waveshare 7.3" e-Paper HAT (E).
 # - Resizes/letterboxes to 800x480
 # - Quantizes to Spectra-6 palette (W,K,R,Y,B,G) with dithering
-# - **Full refresh (clear to white) before displaying the new image**
-# - Sleeps the panel after display
+# - Optional deep-clear (multi-color wipe) to reduce ghosting
+# - Full refresh, then sleeps the panel
 #
 # Usage:
 #   python3 epaper_show.py /path/to/photo.jpg
 #
 # Optional:
-#   python3 epaper_show.py /path/to/photo.jpg --rotate 0|90|180|270 [--no-full]
+#   python3 epaper_show.py /path/to/photo.jpg --rotate 0|90|180|270 --deep-clear 1
 
 import sys, argparse, time
 from pathlib import Path
@@ -38,12 +38,26 @@ def build_palette_image():
     table = []
     for (r,g,b) in PALETTE:
         table += [r,g,b]
-    # pad to 256 entries
-    table += [0,0,0] * (256 - len(PALETTE))
+    table += [0,0,0] * (256 - len(PALETTE))  # pad to 256 entries
     pal.putpalette(table)
     return pal
 
 PAL_IMG = build_palette_image()
+
+# Frames used for deep clear (black → white → red → white)
+DEEP_CLEAN_CYCLE = [(0,0,0), (255,255,255), (255,0,0), (255,255,255)]
+
+def _solid_frame(epd, rgb, wait=2.0):
+    """Display a solid color frame and wait for refresh to finish."""
+    img = Image.new("RGB", (W, H), rgb).quantize(palette=PAL_IMG, dither=Image.NONE)
+    epd.display(epd.getbuffer(img))
+    time.sleep(wait)
+
+def deep_clear(epd, cycles=1, wait=2.0):
+    """Run several solid color frames to aggressively reduce ghosting."""
+    for _ in range(cycles):
+        for rgb in DEEP_CLEAN_CYCLE:
+            _solid_frame(epd, rgb, wait)
 
 def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
     """Return an 800x480 Image in our 6-color palette, filling the screen."""
@@ -56,17 +70,21 @@ def to_epaper_canvas(src: Image.Image, rotate: int = 0) -> Image.Image:
     image_ratio = iw / ih
 
     if image_ratio > target_ratio:
-        # wider than display ratio -> scale to height, center/crop width
+        # Image is wider than display ratio -> scale to height
         scale = H / ih
         nw, nh = int(iw * scale), H
         x = (nw - W) // 2
-        img = img.resize((nw, nh), Image.LANCZOS).crop((x, 0, x + W, H))
+        y = 0
+        img = img.resize((nw, nh), Image.LANCZOS)
+        img = img.crop((x, y, x + W, y + H))
     else:
-        # taller than display ratio -> scale to width, center/crop height
+        # Image is taller -> scale to width
         scale = W / iw
         nw, nh = W, int(ih * scale)
+        x = 0
         y = (nh - H) // 2
-        img = img.resize((nw, nh), Image.LANCZOS).crop((0, y, W, y + H))
+        img = img.resize((nw, nh), Image.LANCZOS)
+        img = img.crop((x, y, x + W, y + H))
 
     # Dither into fixed 6-color palette
     return img.quantize(palette=PAL_IMG, dither=Image.FLOYDSTEINBERG)
@@ -76,8 +94,8 @@ def main():
     ap.add_argument("image", help="Path to source image (jpg/png/etc.)")
     ap.add_argument("--rotate", type=int, choices=[0,90,180,270], default=0,
                     help="Rotate before placing onto canvas")
-    ap.add_argument("--no-full", action="store_true",
-                    help="Skip the full white refresh before displaying")
+    ap.add_argument("--deep-clear", type=int, default=0,
+                    help="Run N deep-clear cycles (K→W→R→W) before showing the image")
     args = ap.parse_args()
 
     src_path = Path(args.image)
@@ -85,17 +103,22 @@ def main():
         print(f"File not found: {src_path}")
         sys.exit(1)
 
-    epd = None
     try:
         epd = epd7in3e.EPD()
         epd.init()
 
-        if not args.no_full:
-            # Full panel clear to white (driver default color is white for this panel)
-            epd.Clear()
-            # Give the panel a moment to settle
-            time.sleep(1.0)
-            # Some Waveshare drivers need re-init after a Clear()
+        if args.deep_clear > 0:
+            print(f"Running deep clear ({args.deep_clear} cycle(s))...")
+            deep_clear(epd, cycles=args.deep_clear, wait=2.0)
+            epd.init()  # reinit after heavy cycling
+        else:
+            # Light clear: Clear + solid white
+            try:
+                epd.Clear()
+                time.sleep(1.0)
+            except Exception:
+                pass
+            _solid_frame(epd, (255,255,255), wait=1.5)
             epd.init()
 
         # Prepare and display image
@@ -103,22 +126,16 @@ def main():
         img = to_epaper_canvas(src, rotate=args.rotate)
         epd.display(epd.getbuffer(img))
 
-        # Ensure refresh has time to complete
-        time.sleep(2.0)
+        time.sleep(2)  # give it time to finish
 
-        # Put panel to sleep (image remains)
         epd.sleep()
+        epd7in3e.epdconfig.module_exit()
 
     except KeyboardInterrupt:
-        pass
+        epd7in3e.epdconfig.module_exit()
     except Exception as e:
         print("Error:", e)
-    finally:
-        # Always exit the SPI/GPIO module cleanly
-        try:
-            epd7in3e.epdconfig.module_exit()
-        except Exception:
-            pass
+        epd7in3e.epdconfig.module_exit()
 
 if __name__ == "__main__":
     main()
