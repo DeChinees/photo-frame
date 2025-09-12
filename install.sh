@@ -61,12 +61,12 @@ echo "==> Upgrading pip & installing Python deps…"
 # optional, ignore failure:
 "$VENV_DIR/bin/pip" install lgpio || true
 
-# Try lgpio (preferred backend for gpiozero on newer Pi OS); ignore failure
-if "$VENV_DIR/bin/pip " install lgpio >/dev/null 2>&1; then
-  echo "==> lgpio installed"
-else
-  echo "==> lgpio unavailable; continuing with RPi.GPIO backend"
-fi
+# # Try lgpio (preferred backend for gpiozero on newer Pi OS); ignore failure
+# if "$VENV_DIR/bin/pip " install lgpio >/dev/null 2>&1; then
+#   echo "==> lgpio installed"
+# else
+#   echo "==> lgpio unavailable; continuing with RPi.GPIO backend"
+# fi
 
 # --- project folders ---
 echo "==> Creating photos/ folder structure…"
