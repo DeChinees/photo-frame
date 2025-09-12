@@ -21,7 +21,7 @@ EPAPER_WIDTH = 800
 EPAPER_HEIGHT = 480
 
 # --- Optional: local waveshare lib (if you vendored it in the repo) ---
-# from waveshare_epd import epd7in3e
+from waveshare_epd import epd7in3e
 try:
     from waveshare_epd import epd7in3e
 except ImportError:
