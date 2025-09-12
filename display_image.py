@@ -26,8 +26,8 @@ try:
     from waveshare_epd import epd7in3e
 except ImportError:
     # If you keep waveshare_epd inside the repo, uncomment these lines:
-    # sys.path.append(str(BASE / "waveshare_epd"))
-    # from epd7in3e import EPD
+    sys.path.append(str(BASE / "waveshare_epd"))
+    from epd7in3e import EPD
     print("Error: waveshare_epd not found. Install per Waveshare's wiki or vendor it in the repo.")
     sys.exit(1)
 
