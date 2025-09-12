@@ -18,7 +18,7 @@ echo "==> User: $(whoami)"
 echo "==> Installing apt packages…"
 sudo apt update
 sudo apt install -y \
-  python3-venv python3-dev libjpeg62-turbo \
+  python3-venv python3-dev python3-pip python3-pil python3-gpizero libjpeg62-turbo \
   libheif1 libheif-examples \
   avahi-daemon
 
@@ -35,6 +35,7 @@ fi
 echo "==> Upgrading pip & installing Python deps…"
 "$VENV_DIR/bin/pip" install --upgrade pip wheel
 "$VENV_DIR/bin/pip" install flask pillow
+"$VENV_DIR/bin/pip" install gpiozero
 
 # --- project folders ---
 echo "==> Creating photos/ folder structure…"
